@@ -13,45 +13,42 @@ jobs:
   build_and_deploy_job:
     if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action != 'closed')
     runs-on: ubuntu-latest
-    name: Build and Deploy Job
+    name: Build and Deploy Angular App
     permissions:
       id-token: write
       contents: read
+
     steps:
-      - uses: actions/checkout@v3
+      # 1️⃣ Checkout source code
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
           submodules: true
           lfs: false
 
-      # ✅ Install Node 20 (fix for Angular 20+)
-      - name: Use Node.js 20
+      # 2️⃣ Use Node 20 (required for Angular 20+)
+      - name: Setup Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      - name: Install OIDC Client from Core Package
-        run: npm install @actions/core@1.6.0 @actions/http-client
+      # 3️⃣ Install dependencies (cleanly)
+      - name: Install dependencies
+        run: npm ci
 
-      - name: Get Id Token
-        uses: actions/github-script@v6
-        id: idtoken
-        with:
-          script: |
-            const coredemo = require('@actions/core')
-            return await coredemo.getIDToken()
-          result-encoding: string
+      # 4️⃣ Build Angular project
+      - name: Build Angular app
+        run: npm run build --if-present
 
-      - name: Build And Deploy
-        id: builddeploy
+      # 5️⃣ Deploy built app to Azure Static Web Apps
+      - name: Deploy to Azure Static Web App
         uses: Azure/static-web-apps-deploy@v1
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_RED_BUSH_056FB690F }}
           action: "upload"
           ###### Repository/Build Configurations ######
-          app_location: "/" # Angular project root
-          api_location: "" # no backend
-          output_location: "dist/ExpenseTracker.Client/browser" # ✅ correct slashes
-          github_id_token: ${{ steps.idtoken.outputs.result }}
+          app_location: "/" # Root of your Angular app
+          output_location: "dist/ExpenseTracker.Client/browser" # ✅ Path after ng build
           ###### End of Configurations ######
 
   close_pull_request_job:
@@ -60,7 +57,6 @@ jobs:
     name: Close Pull Request Job
     steps:
       - name: Close Pull Request
-        id: closepullrequest
         uses: Azure/static-web-apps-deploy@v1
         with:
           action: "close"
